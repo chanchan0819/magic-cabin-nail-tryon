@@ -216,6 +216,11 @@ footer .card p.small{line-height:2.05;letter-spacing:.03em}
           <span class="dot"></span>
           <div style="flex:1"><b id="aiTitle" style="font-size:14px">AI 生成已就绪</b><div class="small" id="aiText" style="margin-top:2px">在右边选好款式和甲型，再点下方「AI 生成」。照片会发到后端，AI 只重画指甲，其他地方不动。</div></div>
         </div>
+        <div style="margin-top:12px">
+          <div class="label" style="margin-bottom:6px">专属码（购买后卖家发给你）</div>
+          <input id="codeInput" type="text" placeholder="输入专属码，例如 NAIL-XXXXXX-XXXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:10px;font-size:15px;box-sizing:border-box">
+          <div class="small" id="codeInfo" style="margin-top:6px">填码后点「AI 生成」，每生成一张扣 1 次，次数用完码就失效。</div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn-ai" id="aiGenerateBtn" type="button">✦ AI 生成</button>
           <button class="btn btn-ghost" id="aiRegenBtn" type="button" style="flex:1" hidden>重新生成</button>
@@ -447,7 +452,9 @@ async function runAiGenerate(){
   if(controller){ timeoutId=setTimeout(function(){ timedOut=true; try{ controller.abort(); }catch(e){} },150000); }
   try{
     var imageDataUri=await buildAiImageDataUri();
-    var fetchOpts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({image:imageDataUri,design:design,designDesc:designDesc,shape:shape})};
+    var codeEl=document.getElementById('codeInput');
+    var buyerCode=codeEl?(codeEl.value||'').trim().toUpperCase():'';
+    var fetchOpts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({image:imageDataUri,design:design,designDesc:designDesc,shape:shape,code:buyerCode})};
     if(controller) fetchOpts.signal=controller.signal;
     var resp=await fetch(GENERATE_API,fetchOpts);
     var json=null;
@@ -462,6 +469,10 @@ async function runAiGenerate(){
     aiState.showingOriginal=false;
     var aiImg=document.getElementById('aiImg');
     aiImg.src=json.image;
+    if(typeof json.remaining==='number'){
+      var ci=document.getElementById('codeInfo');
+      if(ci) ci.textContent='本次生成成功，这个码还剩 '+json.remaining+' 次。';
+    }
     if(regenBtn) regenBtn.hidden=false;
     if(toggleBtn){ toggleBtn.hidden=false; toggleBtn.textContent='看原图'; }
     document.getElementById('aiModeTag').textContent='AI 生成 · 已生成';
@@ -495,6 +506,12 @@ async function runAiGenerate(){
   }
 }
 document.getElementById('aiGenerateBtn').addEventListener('click',function(){ runAiGenerate(); });
+(function(){
+  var ci=document.getElementById('codeInput');
+  if(!ci) return;
+  try{ var saved=localStorage.getItem('nailBuyerCode'); if(saved) ci.value=saved; }catch(e){}
+  ci.addEventListener('input',function(){ try{ localStorage.setItem('nailBuyerCode',(ci.value||'').trim().toUpperCase()); }catch(e){} });
+})();
 document.getElementById('aiRegenBtn').addEventListener('click',function(){ runAiGenerate(); });
 document.getElementById('aiToggleBtn').addEventListener('click',function(){
   if(!aiState.result) return;
