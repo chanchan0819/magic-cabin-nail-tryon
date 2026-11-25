@@ -505,7 +505,7 @@ async function runAiGenerate(){
   if(controller){ timeoutId=setTimeout(function(){ timedOut=true; try{ controller.abort(); }catch(e){} },150000); }
   try{
     var imageDataUri=await buildAiImageDataUri();
-    var fetchOpts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageDataUri,design:design,designDesc:designDesc,shape:shape})};
+    var fetchOpts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({image:imageDataUri,design:design,designDesc:designDesc,shape:shape})};
     if(controller) fetchOpts.signal=controller.signal;
     var resp=await fetch(GENERATE_API,fetchOpts);
     var json=null;
