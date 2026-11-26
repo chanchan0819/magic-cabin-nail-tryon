@@ -195,7 +195,7 @@ footer .card p.small{line-height:2.05;letter-spacing:.03em}
   <!-- TRY ON : AI generation only -->
   <section class="section" id="tryon">
     <div class="section-head">
-      <div><h2>在线试戴 · AI 生成写实效果</h2><p class="small" style="margin:0">上传手照，在右边选好款式和甲型，再点「AI 生成」，大概 25 秒出一张写实效果图。AI 只重画指甲，手、手指、姿势、皮肤、戒指和背景都保持原样。</p></div>
+      <div><h2>在线试戴 · AI 生成写实效果</h2><p class="small" style="margin:0">上传手照，在右边选款式，或者直接传一张你想要的美甲照片，AI 照着把那副美甲搬到你手上，再点「AI 生成」，大概 25 秒出一张写实效果图。AI 只重画指甲，手、手指、姿势、皮肤、戒指和背景都保持原样。</p></div>
       <label class="fileBtn">📷 上传手照 <input id="fileInput" type="file" accept="image/*" hidden></label>
     </div>
 
@@ -231,10 +231,31 @@ footer .card p.small{line-height:2.05;letter-spacing:.03em}
 
       <div class="controls card">
         <div>
+          <div class="label">怎么选款</div>
+          <div class="toggleRow" id="modeRow">
+            <button data-mode="preset" class="active">从款式里选</button>
+            <button data-mode="ref">上传参考图</button>
+          </div>
+        </div>
+        <div id="refBlock" hidden>
+          <div class="label">上传一张你想要的美甲照片</div>
+          <label class="uploadZone" for="refFileInput" aria-label="上传参考美甲图" style="min-height:108px;padding:20px 16px">
+            <span class="uz-icon" aria-hidden="true">💅</span>
+            <span class="uz-title" style="font-size:19px">点这里上传参考图</span>
+            <span class="uz-sub">别人手上戴着你想要的款式的照片就行，截图也可以。AI 会把那副美甲的颜色、图案和甲型，搬到你自己的手上。</span>
+          </label>
+          <input id="refFileInput" type="file" accept="image/*" hidden>
+          <div id="refPreviewWrap" hidden style="margin-top:10px;text-align:center">
+            <img id="refPreview" alt="参考美甲图" style="max-width:170px;border-radius:12px">
+            <div class="small" style="margin-top:6px">参考图已就绪，回左边点「AI 生成」。</div>
+          </div>
+          <p class="small" style="margin:8px 0 0">这个模式不用选款式和甲型，甲型和长度都按参考图来。</p>
+        </div>
+        <div id="styleBlock">
           <div class="label">1 · 选款式</div>
           <div class="chips" id="styleChips"></div>
         </div>
-        <div>
+        <div id="shapeBlock">
           <div class="label">2 · 选甲型 / 长度</div>
           <div class="toggleRow" id="shapeRow">
             <button data-shape="short">短甲 · 方圆</button>
@@ -242,7 +263,7 @@ footer .card p.small{line-height:2.05;letter-spacing:.03em}
             <button data-shape="long">长甲 · 梯形</button>
           </div>
         </div>
-        <div>
+        <div id="occBlock">
           <div class="label">场合（帮你参谋）</div>
           <div class="chips" id="occasionChips">
             <button class="chip" data-occ="daily">日常通勤</button>
@@ -252,7 +273,7 @@ footer .card p.small{line-height:2.05;letter-spacing:.03em}
           </div>
           <p class="small" id="occasionTip" style="margin:8px 0 0"></p>
         </div>
-        <div class="summary">
+        <div class="summary" id="sumBlock">
           <div class="small">你选的款式</div>
           <div style="font-weight:900;font-size:18px;margin:2px 0" id="sumName">—</div>
           <div class="small" id="sumDesc">—</div>
@@ -403,8 +424,8 @@ document.getElementById('fileInput').addEventListener('change',function(e){
   document.getElementById('aiModeTag').textContent='AI 生成 · 待生成';
   document.getElementById('aiHint').textContent='点「AI 生成」看写实效果';
 });
-async function buildAiImageDataUri(){
-  var img=await loadImageForAi(originalSrc);
+async function buildAiImageDataUriFrom(src){
+  var img=await loadImageForAi(src);
   var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
   var sc=Math.min(1, 1024/Math.max(w,h));
   var c=document.createElement('canvas');
@@ -412,6 +433,39 @@ async function buildAiImageDataUri(){
   c.getContext('2d').drawImage(img,0,0,c.width,c.height);
   return c.toDataURL('image/jpeg',0.88);
 }
+async function buildAiImageDataUri(){
+  return buildAiImageDataUriFrom(originalSrc);
+}
+/* ---------- try-on mode: preset styles or a reference photo ---------- */
+var tryMode='preset';
+var refState={src:null};
+function setTryMode(m){
+  tryMode=m;
+  document.querySelectorAll('#modeRow button').forEach(function(b){ b.classList.toggle('active', b.dataset.mode===m); });
+  var ref=(m==='ref');
+  document.getElementById('refBlock').hidden=!ref;
+  document.getElementById('styleBlock').hidden=ref;
+  document.getElementById('shapeBlock').hidden=ref;
+  document.getElementById('occBlock').hidden=ref;
+  document.getElementById('sumBlock').hidden=ref;
+  if(ref){
+    setAiStatus('idle','参考图模式','上传一张戴着你想要款式的美甲照片，AI 会把那副美甲搬到你的手上。这个模式不用选款式和甲型。');
+  }else{
+    setAiStatus('idle','选款式模式','在右边选好款式和甲型，再点「AI 生成」。');
+  }
+}
+document.querySelectorAll('#modeRow button').forEach(function(b){ b.onclick=function(){ setTryMode(b.dataset.mode); }; });
+document.getElementById('refFileInput').addEventListener('change',function(e){
+  var f=e.target.files && e.target.files[0]; if(!f) return;
+  if(refState.src){ try{ URL.revokeObjectURL(refState.src); }catch(err){} }
+  refState.src=URL.createObjectURL(f);
+  document.getElementById('refPreview').src=refState.src;
+  document.getElementById('refPreviewWrap').hidden=false;
+  aiState.result=null; aiState.showingOriginal=false;
+  var tog=document.getElementById('aiToggleBtn'); if(tog) tog.hidden=true;
+  var regen=document.getElementById('aiRegenBtn'); if(regen) regen.hidden=true;
+  setAiStatus('idle','参考图已就绪','点「AI 生成」，把参考图里的美甲戴到你的手上。');
+});
 async function runAiGenerate(){
   if(aiState.generating) return;
   var genBtn=document.getElementById('aiGenerateBtn');
@@ -427,6 +481,13 @@ async function runAiGenerate(){
     if(fileBtn){ fileBtn.scrollIntoView({behavior:'smooth',block:'center'}); }
     return;
   }
+  var isRef=(tryMode==='ref');
+  if(isRef && !refState.src){
+    setAiStatus('fail','请先上传参考图','在右边「上传参考图」里选一张戴着你想要款式的美甲照片，再点「AI 生成」。');
+    document.getElementById('aiHint').textContent='请先上传参考图';
+    var rb=document.getElementById('refBlock'); if(rb) rb.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   var styleObj=STYLES.find(function(x){return x.id===state.style;})||STYLES[0];
   var design=DESIGN_CN[state.style]||styleObj.name;
   var designDesc=getDesignDesc(state.style);
@@ -438,13 +499,14 @@ async function runAiGenerate(){
   overlay.classList.add('on');
   var startedAt=Date.now();
   if(overlayText) overlayText.textContent='正在生成，大概需要 25 秒…';
-  setAiStatus('idle','正在生成，大概需要 25 秒…','正在把「'+design+' · '+shape+'」生成到你的手上。AI 只改指甲，手和背景保持原样，请不要关页面。');
+  var jobName=isRef?'参考图里的美甲':'「'+design+' · '+shape+'」';
+  setAiStatus('idle','正在生成，大概需要 25 秒…','正在把'+jobName+'生成到你的手上。AI 只改指甲，手和背景保持原样，请不要关页面。');
   document.getElementById('aiModeTag').textContent='AI 生成 · 生成中…';
   if(aiState.elapsedTimer) clearInterval(aiState.elapsedTimer);
   aiState.elapsedTimer=setInterval(function(){
     var sec=Math.round((Date.now()-startedAt)/1000);
     if(overlayText) overlayText.textContent='正在生成，大概需要 25 秒… 已等 '+sec+' 秒';
-    setAiStatus('idle','正在生成，大概需要 25 秒… 已等 '+sec+' 秒','正在生成「'+design+' · '+shape+'」，AI 只改指甲，手和背景保持原样。');
+    setAiStatus('idle','正在生成，大概需要 25 秒… 已等 '+sec+' 秒','正在生成'+jobName+'，AI 只改指甲，手和背景保持原样。');
   },1000);
   var controller=(typeof AbortController!=='undefined')?new AbortController():null;
   var timedOut=false;
@@ -454,7 +516,9 @@ async function runAiGenerate(){
     var imageDataUri=await buildAiImageDataUri();
     var codeEl=document.getElementById('codeInput');
     var buyerCode=codeEl?(codeEl.value||'').trim().toUpperCase():'';
-    var fetchOpts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({image:imageDataUri,design:design,designDesc:designDesc,shape:shape,code:buyerCode})};
+    var payload={image:imageDataUri,design:design,designDesc:designDesc,shape:shape,code:buyerCode};
+    if(isRef){ payload.mode='ref'; payload.refImage=await buildAiImageDataUriFrom(refState.src); }
+    var fetchOpts={method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)};
     if(controller) fetchOpts.signal=controller.signal;
     var resp=await fetch(GENERATE_API,fetchOpts);
     var json=null;
